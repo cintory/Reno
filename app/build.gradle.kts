@@ -1,9 +1,17 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.android.dagger)
   alias(libs.plugins.kotlin.kapt)
+}
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+  localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
 android {
@@ -20,10 +28,26 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  signingConfigs {
+    create("release") {
+      val storePath = localProperties.getProperty("RELEASE_STORE_FILE") ?: ""
+      if (storePath.isNotEmpty()) {
+        storeFile = file(storePath)
+        storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
+        keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
+        keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+      }
+    }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      val storePath = localProperties.getProperty("RELEASE_STORE_FILE") ?: ""
+      if (storePath.isNotEmpty()) {
+        signingConfig = signingConfigs.getByName("release")
+      }
     }
   }
   compileOptions {
