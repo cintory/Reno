@@ -49,6 +49,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -416,7 +417,7 @@ private fun CurrencyDropdown(
 
 @Composable
 fun RateCard(rate: ExchangeRate) {
-  var expanded by remember { mutableStateOf(false) }
+  var expanded by rememberSaveable { mutableStateOf(false) }
 
   Card(
     modifier = Modifier
