@@ -26,7 +26,7 @@ object DatabaseModule {
       context,
       RenoDatabase::class.java,
       "reno_database"
-    ).build()
+    ).fallbackToDestructiveMigration(true).build()
   }
 
   @Provides

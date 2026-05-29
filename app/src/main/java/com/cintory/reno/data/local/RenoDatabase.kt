@@ -8,7 +8,7 @@ import com.cintory.reno.data.model.ExchangeRate
  * Created by Cintory on 2026/5/26 15:00
  * Email：Cintory@gmail.com
  */
-@Database(entities = [ExchangeRate::class], version = 1, exportSchema = false)
+@Database(entities = [ExchangeRate::class], version = 2, exportSchema = false)
 abstract class RenoDatabase : RoomDatabase() {
   abstract fun exchangeRateDao(): ExchangeRateDao
 }

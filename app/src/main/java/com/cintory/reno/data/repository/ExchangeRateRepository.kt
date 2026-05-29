@@ -8,6 +8,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,13 +30,17 @@ class ExchangeRateRepository @Inject constructor(
 
   fun getAllRates(): Flow<List<ExchangeRate>> = dao.getAllRates()
 
+  fun getHistoryRates(name: String): Flow<List<ExchangeRate>> = dao.getHistoryRates(name)
+
   suspend fun getLastUpdateTime(): String? = dao.getLastUpdateTime()
 
   suspend fun hasCachedData(): Boolean = dao.getCount() > 0
 
   suspend fun refreshRates() = withContext(Dispatchers.IO) {
+    Timber.d("refreshRates: fetching first page")
     val firstPageDoc = fetchDocument("${baseUrl}index.html")
     val totalPages = getTotalPages(firstPageDoc)
+    Timber.d("refreshRates: total pages = %d", totalPages)
 
     val allRates = mutableListOf<ExchangeRate>()
     allRates.addAll(parsePage(firstPageDoc))
@@ -40,12 +48,23 @@ class ExchangeRateRepository @Inject constructor(
     for (page in 1 until totalPages) {
       delay(500)
       val url = "${baseUrl}index_$page.html"
+      Timber.d("refreshRates: fetching page %d", page + 1)
       val doc = fetchDocument(url)
       allRates.addAll(parsePage(doc))
     }
 
-    dao.clearAll()
+    Timber.d("refreshRates: inserting %d rates into DB", allRates.size)
     dao.insertAll(allRates)
+    cleanOldData()
+    Timber.d("refreshRates: done")
+  }
+
+  private suspend fun cleanOldData() {
+    val sdf = SimpleDateFormat("yyyy.MM.dd", Locale.getDefault())
+    val calendar = Calendar.getInstance()
+    calendar.add(Calendar.DAY_OF_YEAR, -365)
+    val cutoff = sdf.format(calendar.time)
+    dao.deleteOlderThan(cutoff)
   }
 
   private fun fetchDocument(url: String): Document {

@@ -8,7 +8,11 @@ import com.cintory.reno.data.model.ExchangeRate
 import com.cintory.reno.data.repository.ExchangeRateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import timber.log.Timber
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,8 +44,12 @@ class ExchangeRateViewModel @Inject constructor(
   private val _uiState = MutableStateFlow<RateUiState>(RateUiState.Loading)
   val uiState: StateFlow<RateUiState> = _uiState
 
+  private var refreshJob: Job? = null
+
   val latestRates: StateFlow<List<ExchangeRate>> = repository.getLatestRates()
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  fun getHistoryRates(name: String): Flow<List<ExchangeRate>> = repository.getHistoryRates(name)
 
   fun getSavedFromCurrency(): String = prefs.getString(KEY_FROM, CNY) ?: CNY
   fun getSavedToCurrency(): String = prefs.getString(KEY_TO, "") ?: ""
@@ -72,13 +80,21 @@ class ExchangeRateViewModel @Inject constructor(
   }
 
   private fun initialLoad() {
-    viewModelScope.launch {
+    Timber.d("initialLoad started")
+    refreshJob = viewModelScope.launch {
       try {
         if (!repository.hasCachedData()) {
           _uiState.value = RateUiState.Loading
         }
         repository.refreshRates()
+        val lastUpdate = repository.getLastUpdateTime()
+        _uiState.value = RateUiState.Success(latestRates.value, lastUpdate)
+        Timber.d("initialLoad completed")
+      } catch (e: CancellationException) {
+        Timber.d("initialLoad cancelled")
+        throw e
       } catch (e: Exception) {
+        Timber.e(e, "initialLoad failed")
         if (_uiState.value is RateUiState.Loading) {
           _uiState.value = RateUiState.Error(e.message ?: "未知错误")
         }
@@ -87,9 +103,13 @@ class ExchangeRateViewModel @Inject constructor(
   }
 
   fun refreshRates() {
-    if (_uiState.value is RateUiState.Refreshing) return
-    viewModelScope.launch {
+    if (refreshJob?.isActive == true) {
+      Timber.d("refresh already in progress, skipping")
+      return
+    }
+    refreshJob = viewModelScope.launch {
       val current = _uiState.value
+      Timber.d("refreshRates started, current state: %s", current::class.simpleName)
       if (current is RateUiState.Success) {
         _uiState.value = RateUiState.Refreshing
       } else {
@@ -97,11 +117,18 @@ class ExchangeRateViewModel @Inject constructor(
       }
       try {
         repository.refreshRates()
+        val lastUpdate = repository.getLastUpdateTime()
+        _uiState.value = RateUiState.Success(latestRates.value, lastUpdate)
+        Timber.d("refreshRates completed")
+      } catch (e: CancellationException) {
+        Timber.d("refreshRates cancelled")
+        throw e
       } catch (e: Exception) {
-        if (_uiState.value !is RateUiState.Success) {
-          _uiState.value = RateUiState.Error(e.message ?: "刷新失败")
-        } else {
+        Timber.e(e, "refreshRates failed")
+        if (current is RateUiState.Success) {
           _uiState.value = current
+        } else {
+          _uiState.value = RateUiState.Error(e.message ?: "刷新失败")
         }
       }
     }
@@ -111,9 +138,12 @@ class ExchangeRateViewModel @Inject constructor(
     viewModelScope.launch {
       while (true) {
         delay(30 * 60 * 1000L)
+        Timber.d("periodic refresh triggered")
         try {
           repository.refreshRates()
+          Timber.d("periodic refresh completed")
         } catch (_: Exception) {
+          Timber.w("periodic refresh failed")
         }
       }
     }

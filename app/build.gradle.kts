@@ -81,6 +81,9 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.room)
   kapt(libs.androidx.room.compiler)
+  implementation(libs.androidx.work.runtime)
+  implementation(libs.androidx.hilt.work)
+  kapt(libs.androidx.hilt.compiler)
   kapt(libs.android.dagger.hilt.compiler)
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.junit)
@@ -91,5 +94,6 @@ dependencies {
   debugImplementation(libs.androidx.ui.test.manifest)
 
   implementation(libs.jsoup)
+  implementation(libs.timber)
 
 }

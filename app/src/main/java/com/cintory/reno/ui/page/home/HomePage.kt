@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -260,7 +262,7 @@ fun HomePage(
             key = { it.name },
             contentType = { "rate_card" }
           ) { rate ->
-            RateCard(rate)
+            RateCard(rate, navController)
           }
 
           item {
@@ -416,7 +418,7 @@ private fun CurrencyDropdown(
 }
 
 @Composable
-fun RateCard(rate: ExchangeRate) {
+fun RateCard(rate: ExchangeRate, navController: NavHostController) {
   var expanded by rememberSaveable { mutableStateOf(false) }
 
   Card(
@@ -466,7 +468,20 @@ fun RateCard(rate: ExchangeRate) {
         RateRow("现钞卖出", rate.mSellPrice)
         RateRow("中行折算价", rate.conversionPrice)
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(
+          onClick = { navController.navigate("trend/${rate.name}") },
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Icon(
+            Icons.AutoMirrored.Filled.ShowChart,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+          )
+          Spacer(modifier = Modifier.width(4.dp))
+          Text("查看趋势")
+        }
+
         Text(
           text = rate.publishTime,
           style = MaterialTheme.typography.bodySmall,

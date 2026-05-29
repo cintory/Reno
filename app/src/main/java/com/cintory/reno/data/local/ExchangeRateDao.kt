@@ -40,4 +40,10 @@ interface ExchangeRateDao {
 
   @Query("SELECT COUNT(*) FROM exchange_rate")
   suspend fun getCount(): Int
+
+  @Query("SELECT * FROM exchange_rate WHERE name = :name ORDER BY publishTime ASC")
+  fun getHistoryRates(name: String): Flow<List<ExchangeRate>>
+
+  @Query("DELETE FROM exchange_rate WHERE publishTime < :cutoffTime")
+  suspend fun deleteOlderThan(cutoffTime: String)
 }

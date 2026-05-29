@@ -7,4 +7,5 @@ package com.cintory.reno.ui.page.common
 object RouteName {
   const val HOME = "home"
   const val CREATE = "create"
+  const val TREND = "trend/{currencyName}"
 }

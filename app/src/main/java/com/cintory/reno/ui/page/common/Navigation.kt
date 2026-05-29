@@ -13,7 +13,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.cintory.reno.ui.page.home.HomePage
+import com.cintory.reno.ui.page.trend.TrendPage
 import com.cintory.reno.ui.theme.RenoTheme
 
 /**
@@ -43,6 +46,13 @@ fun Navigation() {
       ) {
         composable(RouteName.HOME) {
           HomePage(navController = navController)
+        }
+        composable(
+          route = RouteName.TREND,
+          arguments = listOf(navArgument("currencyName") { type = NavType.StringType })
+        ) { backStackEntry ->
+          val currencyName = backStackEntry.arguments?.getString("currencyName") ?: ""
+          TrendPage(currencyName = currencyName, navController = navController)
         }
       }
     }
