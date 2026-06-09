@@ -46,6 +46,9 @@ class ExchangeRateViewModel @Inject constructor(
 
   private var refreshJob: Job? = null
 
+  private val _changePercentages = MutableStateFlow<Map<String, Double>>(emptyMap())
+  val changePercentages: StateFlow<Map<String, Double>> = _changePercentages
+
   val latestRates: StateFlow<List<ExchangeRate>> = repository.getLatestRates()
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -66,6 +69,17 @@ class ExchangeRateViewModel @Inject constructor(
     observeRates()
     initialLoad()
     startPeriodicRefresh()
+    loadChangePercentages()
+  }
+
+  private fun loadChangePercentages() {
+    viewModelScope.launch {
+      try {
+        _changePercentages.value = repository.getChangePercentages()
+      } catch (e: Exception) {
+        Timber.w(e, "failed to load change percentages")
+      }
+    }
   }
 
   private fun observeRates() {
@@ -89,6 +103,7 @@ class ExchangeRateViewModel @Inject constructor(
         repository.refreshRates()
         val lastUpdate = repository.getLastUpdateTime()
         _uiState.value = RateUiState.Success(latestRates.value, lastUpdate)
+        loadChangePercentages()
         Timber.d("initialLoad completed")
       } catch (e: CancellationException) {
         Timber.d("initialLoad cancelled")
@@ -119,6 +134,7 @@ class ExchangeRateViewModel @Inject constructor(
         repository.refreshRates()
         val lastUpdate = repository.getLastUpdateTime()
         _uiState.value = RateUiState.Success(latestRates.value, lastUpdate)
+        loadChangePercentages()
         Timber.d("refreshRates completed")
       } catch (e: CancellationException) {
         Timber.d("refreshRates cancelled")

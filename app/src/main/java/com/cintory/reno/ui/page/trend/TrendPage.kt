@@ -151,7 +151,7 @@ fun TrendPage(
           dailyRates = dailyRates,
           modifier = Modifier
             .fillMaxWidth()
-            .height(240.dp)
+            .height(280.dp)
             .padding(horizontal = 16.dp)
         )
 
@@ -178,11 +178,35 @@ private fun TrendChart(
   val onSurfaceColor = MaterialTheme.colorScheme.onSurfaceVariant
   val surfaceColor = MaterialTheme.colorScheme.inverseSurface
   val onSurfaceInverseColor = MaterialTheme.colorScheme.inverseOnSurface
+  val highColor = MaterialTheme.colorScheme.error
+  val lowColor = Color(0xFF4CAF50)
   val density = LocalDensity.current
   val labelSizePx = with(density) { 10.sp.toPx() }
   val tooltipTextSizePx = with(density) { 11.sp.toPx() }
 
   var selectedIndex by remember(dailyRates) { mutableStateOf(-1) }
+
+  val prices = remember(dailyRates) { dailyRates.map { it.price } }
+  val minPrice = remember(prices) { prices.min() }
+  val maxPrice = remember(prices) { prices.max() }
+  val priceRange = remember(minPrice, maxPrice) { if (maxPrice - minPrice < 0.01) 1.0 else maxPrice - minPrice }
+  val yPadding = remember(priceRange) { priceRange * 0.1 }
+  val yMin = remember(minPrice, yPadding) { minPrice - yPadding }
+  val yMax = remember(maxPrice, yPadding) { maxPrice + yPadding }
+  val yRange = remember(yMin, yMax) { yMax - yMin }
+
+  val paddingLeft = remember(yMin, yMax, yRange, labelSizePx) {
+    val paint = android.graphics.Paint().apply {
+      textSize = labelSizePx
+      isAntiAlias = true
+    }
+    val maxLabelWidth = (0..4).maxOf { i ->
+      val value = yMax - (i.toFloat() / 4) * yRange
+      paint.measureText(String.format("%.2f", value))
+    }
+    maxLabelWidth + 20f
+  }
+  val paddingRight = 12f
 
   Card(
     modifier = modifier,
@@ -192,14 +216,14 @@ private fun TrendChart(
       modifier = Modifier
         .fillMaxSize()
         .padding(top = 16.dp, bottom = 8.dp, start = 8.dp, end = 16.dp)
-        .pointerInput(dailyRates) {
+        .pointerInput(dailyRates, paddingLeft) {
           detectDragGestures(
             onDragStart = { offset ->
-              selectedIndex = findNearestIndex(offset.x, dailyRates.size, 60f, size.width - 68f)
+              selectedIndex = findNearestIndex(offset.x, dailyRates.size, paddingLeft, size.width - paddingLeft - paddingRight)
             },
             onDrag = { change, _ ->
               change.consume()
-              selectedIndex = findNearestIndex(change.position.x, dailyRates.size, 60f, size.width - 68f)
+              selectedIndex = findNearestIndex(change.position.x, dailyRates.size, paddingLeft, size.width - paddingLeft - paddingRight)
             },
             onDragEnd = { selectedIndex = -1 },
             onDragCancel = { selectedIndex = -1 }
@@ -210,22 +234,11 @@ private fun TrendChart(
         return@Canvas
       }
 
-      val paddingLeft = 60f
-      val paddingBottom = 40f
-      val paddingTop = 8f
-      val paddingRight = 8f
+      val paddingBottom = 48f
+      val paddingTop = 12f
 
       val chartWidth = size.width - paddingLeft - paddingRight
       val chartHeight = size.height - paddingTop - paddingBottom
-
-      val prices = dailyRates.map { it.price }
-      val minPrice = prices.min()
-      val maxPrice = prices.max()
-      val priceRange = if (maxPrice - minPrice < 0.01) 1.0 else maxPrice - minPrice
-      val yPadding = priceRange * 0.1
-      val yMin = minPrice - yPadding
-      val yMax = maxPrice + yPadding
-      val yRange = yMax - yMin
 
       drawGridAndLabels(
         dailyRates = dailyRates,
@@ -235,7 +248,6 @@ private fun TrendChart(
         paddingLeft = paddingLeft,
         paddingTop = paddingTop,
         paddingRight = paddingRight,
-        paddingBottom = paddingBottom,
         chartWidth = chartWidth,
         chartHeight = chartHeight,
         gridColor = outlineColor,
@@ -259,8 +271,34 @@ private fun TrendChart(
 
       if (dailyRates.size <= 60) {
         points.forEach { point ->
-          drawCircle(primaryColor, radius = 4f, center = point)
+          drawCircle(Color.White, radius = 6f, center = point)
+          drawCircle(primaryColor, radius = 4.5f, center = point)
         }
+      }
+
+      val maxIndex = prices.indices.maxByOrNull { prices[it] } ?: 0
+      val minIndex = prices.indices.minByOrNull { prices[it] } ?: 0
+
+      drawHighLowMarker(
+        point = points[maxIndex],
+        label = String.format("%.2f", prices[maxIndex]),
+        color = highColor,
+        above = true,
+        paddingLeft = paddingLeft,
+        chartWidth = chartWidth,
+        labelSizePx = labelSizePx
+      )
+
+      if (maxIndex != minIndex) {
+        drawHighLowMarker(
+          point = points[minIndex],
+          label = String.format("%.2f", prices[minIndex]),
+          color = lowColor,
+          above = false,
+          paddingLeft = paddingLeft,
+          chartWidth = chartWidth,
+          labelSizePx = labelSizePx
+        )
       }
 
       if (selectedIndex in points.indices) {
@@ -313,6 +351,34 @@ private fun TrendChart(
   }
 }
 
+private fun DrawScope.drawHighLowMarker(
+  point: Offset,
+  label: String,
+  color: Color,
+  above: Boolean,
+  paddingLeft: Float,
+  chartWidth: Float,
+  labelSizePx: Float,
+) {
+  drawCircle(Color.White, radius = 7f, center = point)
+  drawCircle(color, radius = 5f, center = point)
+
+  val paint = android.graphics.Paint().apply {
+    textSize = labelSizePx
+    isAntiAlias = true
+    this.color = color.hashCode()
+    typeface = android.graphics.Typeface.DEFAULT_BOLD
+    textAlign = android.graphics.Paint.Align.CENTER
+  }
+  val textY = if (above) point.y - 12f else point.y + labelSizePx + 10f
+  var textX = point.x
+  val textWidth = paint.measureText(label) / 2
+  if (textX - textWidth < paddingLeft) textX = paddingLeft + textWidth
+  if (textX + textWidth > paddingLeft + chartWidth) textX = paddingLeft + chartWidth - textWidth
+
+  drawContext.canvas.nativeCanvas.drawText(label, textX, textY, paint)
+}
+
 private fun findNearestIndex(touchX: Float, count: Int, paddingLeft: Float, chartWidth: Float): Int {
   if (count < 2) return -1
   val ratio = ((touchX - paddingLeft) / chartWidth).coerceIn(0f, 1f)
@@ -327,7 +393,6 @@ private fun DrawScope.drawGridAndLabels(
   paddingLeft: Float,
   paddingTop: Float,
   paddingRight: Float,
-  paddingBottom: Float,
   chartWidth: Float,
   chartHeight: Float,
   gridColor: Color,
@@ -339,6 +404,7 @@ private fun DrawScope.drawGridAndLabels(
     color = labelColor.hashCode()
     textSize = labelSizePx
     isAntiAlias = true
+    textAlign = android.graphics.Paint.Align.RIGHT
   }
 
   for (i in 0..gridLines) {
@@ -355,7 +421,7 @@ private fun DrawScope.drawGridAndLabels(
 
     drawContext.canvas.nativeCanvas.drawText(
       String.format("%.2f", value),
-      2f,
+      paddingLeft - 10f,
       y + labelSizePx / 3,
       paint
     )
@@ -366,6 +432,7 @@ private fun DrawScope.drawGridAndLabels(
   else dailyRates.size / (maxXLabels - 1)
 
   paint.textAlign = android.graphics.Paint.Align.CENTER
+  val xLabelY = paddingTop + chartHeight + labelSizePx + 16f
   for (i in dailyRates.indices step step) {
     val x = paddingLeft + (i.toFloat() / (dailyRates.size - 1)) * chartWidth
     val label = dailyRates[i].date.substring(5)
@@ -373,7 +440,7 @@ private fun DrawScope.drawGridAndLabels(
     drawContext.canvas.nativeCanvas.drawText(
       label,
       x,
-      size.height - 2f,
+      xLabelY,
       paint
     )
   }
@@ -381,7 +448,7 @@ private fun DrawScope.drawGridAndLabels(
   if (step > 1 && (dailyRates.size - 1) % step != 0) {
     val x = paddingLeft + chartWidth
     val label = dailyRates.last().date.substring(5)
-    drawContext.canvas.nativeCanvas.drawText(label, x, size.height - 2f, paint)
+    drawContext.canvas.nativeCanvas.drawText(label, x, xLabelY, paint)
   }
 }
 

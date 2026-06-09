@@ -36,6 +36,26 @@ class ExchangeRateRepository @Inject constructor(
 
   suspend fun hasCachedData(): Boolean = dao.getCount() > 0
 
+  suspend fun getChangePercentages(): Map<String, Double> = withContext(Dispatchers.IO) {
+    val previousRates = dao.getPreviousDayRates()
+    if (previousRates.isEmpty()) return@withContext emptyMap()
+
+    val latestRates = dao.getLatestRatesOnce()
+    val prevMap = previousRates.associateBy { it.name }
+
+    latestRates.mapNotNull { current ->
+      val prev = prevMap[current.name] ?: return@mapNotNull null
+      val currentPrice = getPrice(current) ?: return@mapNotNull null
+      val prevPrice = getPrice(prev) ?: return@mapNotNull null
+      if (prevPrice == 0.0) return@mapNotNull null
+      current.name to (currentPrice - prevPrice) / prevPrice * 100
+    }.toMap()
+  }
+
+  private fun getPrice(rate: ExchangeRate): Double? {
+    return rate.conversionPrice.toDoubleOrNull() ?: rate.fSellPrice.toDoubleOrNull()
+  }
+
   suspend fun refreshRates() = withContext(Dispatchers.IO) {
     Timber.d("refreshRates: fetching first page")
     val firstPageDoc = fetchDocument("${baseUrl}index.html")

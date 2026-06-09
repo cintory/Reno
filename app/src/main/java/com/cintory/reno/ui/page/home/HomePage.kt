@@ -1,6 +1,7 @@
 package com.cintory.reno.ui.page.home
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -176,6 +177,8 @@ fun HomePage(
           ExchangeRateViewModel.sortedRates(rates)
         }
 
+        val changePercentages by viewModel.changePercentages.collectAsState()
+
         val convertedResult by remember(amountText, fromCurrency, toCurrency, rates) {
           derivedStateOf {
             val amount = amountText.toDoubleOrNull() ?: return@derivedStateOf null
@@ -262,7 +265,7 @@ fun HomePage(
             key = { it.name },
             contentType = { "rate_card" }
           ) { rate ->
-            RateCard(rate, navController)
+            RateCard(rate, navController, changePercentages[rate.name])
           }
 
           item {
@@ -418,7 +421,7 @@ private fun CurrencyDropdown(
 }
 
 @Composable
-fun RateCard(rate: ExchangeRate, navController: NavHostController) {
+fun RateCard(rate: ExchangeRate, navController: NavHostController, changePercent: Double? = null) {
   var expanded by rememberSaveable { mutableStateOf(false) }
 
   Card(
@@ -434,11 +437,23 @@ fun RateCard(rate: ExchangeRate, navController: NavHostController) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        Text(
-          text = rate.name,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold
-        )
+        Column {
+          Text(
+            text = rate.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+          )
+          if (changePercent != null) {
+            val isUp = changePercent >= 0
+            val color = if (isUp) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+            val sign = if (isUp) "+" else ""
+            Text(
+              text = "${sign}${String.format("%.2f", changePercent)}%",
+              style = MaterialTheme.typography.labelSmall,
+              color = color
+            )
+          }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
           if (rate.conversionPrice.isNotEmpty()) {
             Text(
